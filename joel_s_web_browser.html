@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Joel's Web - Interactive Web Browser</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace']
+                    },
+                    colors: {
+                        brand: {
+                            50: 'var(--brand-50)',
+                            100: 'var(--brand-100)',
+                            500: 'var(--brand-500)',
+                            600: 'var(--brand-600)',
+                            700: 'var(--brand-700)',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --brand-50: #eff6ff;
+            --brand-100: #dbeafe;
+            --brand-500: #3b82f6;
+            --brand-600: #2563eb;
+            --brand-700: #1d4ed8;
+        }
+
+        /* Custom scrollbar for simulated viewport */
+        .custom-scroll::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+        }
+        .dark .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.5);
+            border-radius: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+            background: rgba(107, 114, 128, 0.8);
+        }
+
+        /* Tab active indicator styling */
+        .tab-active {
+            position: relative;
+        }
+        .tab-active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background-color: var(--brand-500);
+            border-top-left-radius: 2px;
+            border-top-right-radius: 2px;
+        }
+
+        /* Smooth loading bar animation */
+        @keyframes loading-progress {
+            0% { width: 0%; }
+            50% { width: 70%; }
+            100% { width: 100%; }
+        }
+        .animate-loading {
+            animation: loading-progress 0.4s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans min-h-screen flex flex-col justify-between p-2 sm:p-4 select-none overflow-x-hidden">
+
+    <!-- Main Outer Window Container simulating OS Window / Desktop View -->
+    <div class="max-w-7xl w-full mx-auto bg-gray-800/90 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-700/60 overflow-hidden flex flex-col flex-1 min-h-[90vh]">
+
+        <!-- BROWSER CHROME HEADER -->
+        <header class="bg-gray-900/90 border-b border-gray-700/80 flex flex-col flex-shrink-0">
+            
+            <!-- TOP ROW: Window Controls & Tab Bar -->
+            <div class="flex items-center px-3 pt-2 gap-2 overflow-x-auto no-scrollbar">
+                <!-- Mac-style Window Controls -->
+                <div class="flex items-center gap-1.5 px-2 mr-2">
+                    <button onclick="simulateWindowAction('close')" class="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600 transition flex items-center justify-center group" title="Close Window">
+                        <i class="fas fa-times text-[8px] text-red-900 opacity-0 group-hover:opacity-100"></i>
+                    </button>
+                    <button onclick="simulateWindowAction('minimize')" class="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-600 transition flex items-center justify-center group" title="Minimize">
+                        <i class="fas fa-minus text-[8px] text-yellow-900 opacity-0 group-hover:opacity-100"></i>
+                    </button>
+                    <button onclick="toggleFullscreen()" class="w-3 h-3 rounded-full bg-green-500 hover:bg-green-600 transition flex items-center justify-center group" title="Maximize">
+                        <i class="fas fa-expand text-[8px] text-green-900 opacity-0 group-hover:opacity-100"></i>
+                    </button>
+                </div>
+
+                <!-- Tabs Container -->
+                <div id="tabs-container" class="flex items-center gap-1 overflow-x-auto max-w-full">
+                    <!-- Dynamic Tabs rendered via JavaScript -->
+                </div>
+
+                <!-- Add New Tab Button -->
+                <button onclick="createNewTab()" class="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition" title="Open New Tab">
+                    <i class="fas fa-plus text-xs"></i>
+                </button>
+            </div>
+
+            <!-- MIDDLE ROW: Navigation Controls & Address Bar -->
+            <div class="flex items-center gap-2 px-3 py-2 bg-gray-800/80 border-t border-gray-700/50">
+                <!-- Nav Action Buttons -->
+                <div class="flex items-center gap-1 text-gray-300">
+                    <button id="btn-back" onclick="goBack()" class="p-1.5 rounded-lg hover:bg-gray-700 disabled:opacity-30 disabled:hover:bg-transparent transition" title="Back">
+                        <i class="fas fa-arrow-left text-sm"></i>
+                    </button>
+                    <button id="btn-forward" onclick="goForward()" class="p-1.5 rounded-lg hover:bg-gray-700 disabled:opacity-30 disabled:hover:bg-transparent transition" title="Forward">
+                        <i class="fas fa-arrow-right text-sm"></i>
+                    </button>
+                    <button onclick="refreshPage()" class="p-1.5 rounded-lg hover:bg-gray-700 transition" title="Reload Page">
+                        <i id="refresh-icon" class="fas fa-redo-alt text-sm"></i>
+                    </button>
+                    <button onclick="navigateTo('joelsweb://home')" class="p-1.5 rounded-lg hover:bg-gray-700 transition" title="Home Page">
+                        <i class="fas fa-home text-sm"></i>
+                    </button>
+                </div>
+
+                <!-- URL Address Bar -->
+                <form id="url-form" onsubmit="handleUrlSubmit(event)" class="flex-1 flex items-center bg-gray-900/90 hover:bg-gray-900 border border-gray-700 focus-within:border-blue-500 rounded-full px-3 py-1.5 shadow-inner transition">
+                    <i class="fas fa-lock text-green-400 text-xs mr-2" title="Connection is Secure (joelsweb:// standard)"></i>
+                    <input id="url-input" type="text" autocomplete="off" value="joelsweb://home" class="w-full bg-transparent text-xs sm:text-sm text-gray-100 focus:outline-none font-mono" placeholder="Search or enter Joel's Web URL (e.g. joelsweb://about)" />
+                    <button type="button" onclick="toggleBookmarkCurrent()" id="star-btn" class="text-gray-400 hover:text-yellow-400 px-1 transition" title="Bookmark Page">
+                        <i class="far fa-star text-sm"></i>
+                    </button>
+                    <button type="submit" class="text-gray-400 hover:text-blue-400 px-1 transition" title="Go">
+                        <i class="fas fa-arrow-right text-xs"></i>
+                    </button>
+                </form>
+
+                <!-- Quick Browser Tools -->
+                <div class="flex items-center gap-1">
+                    <button onclick="toggleShield()" id="shield-btn" class="p-1.5 text-green-400 hover:bg-gray-700 rounded-lg transition" title="Joel Shield: Active Protection">
+                        <i class="fas fa-shield-alt text-sm"></i>
+                    </button>
+                    <button onclick="navigateTo('joelsweb://settings')" class="p-1.5 text-gray-300 hover:bg-gray-700 rounded-lg transition" title="Browser Settings">
+                        <i class="fas fa-cog text-sm"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- BOTTOM ROW: Bookmarks Bar -->
+            <div id="bookmarks-bar" class="flex items-center gap-2 px-3 py-1 bg-gray-900/60 border-t border-gray-800 text-xs overflow-x-auto whitespace-nowrap">
+                <span class="text-gray-500 text-[10px] uppercase font-bold tracking-wider px-1">Bookmarks:</span>
+                <button onclick="navigateTo('joelsweb://home')" class="px-2 py-1 text-gray-300 hover:bg-gray-800 rounded flex items-center gap-1.5 transition">
+                    <i class="fas fa-compass text-blue-400"></i> Home
+                </button>
+                <button onclick="navigateTo('joelsweb://about')" class="px-2 py-1 text-gray-300 hover:bg-gray-800 rounded flex items-center gap-1.5 transition">
+                    <i class="fas fa-user-circle text-purple-400"></i> About Joel
+                </button>
+                <button onclick="navigateTo('joelsweb://features')" class="px-2 py-1 text-gray-300 hover:bg-gray-800 rounded flex items-center gap-1.5 transition">
+                    <i class="fas fa-bolt text-yellow-400"></i> Features
+                </button>
+                <button onclick="navigateTo('joelsweb://games')" class="px-2 py-1 text-gray-300 hover:bg-gray-800 rounded flex items-center gap-1.5 transition">
+                    <i class="fas fa-gamepad text-green-400"></i> Arcade Game
+                </button>
+                <button onclick="navigateTo('joelsweb://settings')" class="px-2 py-1 text-gray-300 hover:bg-gray-800 rounded flex items-center gap-1.5 transition">
+                    <i class="fas fa-sliders-h text-pink-400"></i> Settings
+                </button>
+            </div>
+
+            <!-- Loading Progress Bar -->
+            <div id="loading-bar-container" class="h-0.5 w-full bg-transparent overflow-hidden">
+                <div id="loading-bar" class="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 w-0"></div>
+            </div>
+        </header>
+
+        <!-- BROWSER VIEWPORT CONTENT AREA -->
+        <main id="browser-viewport" class="flex-1 bg-gray-950 text-gray-100 overflow-y-auto custom-scroll relative">
+            <!-- Dynamic Content rendered inside via JS -->
+        </main>
+
+        <!-- BROWSER STATUS FOOTER -->
+        <footer class="bg-gray-900 border-t border-gray-800 px-4 py-1.5 flex items-center justify-between text-[11px] text-gray-400 flex-shrink-0">
+            <div class="flex items-center gap-2">
+                <span id="status-indicator" class="w-2 h-2 rounded-full bg-green-500 inline-block animate-pulse"></span>
+                <span id="status-text">Connected to Joel's Web Engine v3.5 (Ultra-Fast)</span>
+            </div>
+            <div class="flex items-center gap-4 hidden sm:flex">
+                <span><i class="fas fa-shield-alt text-green-400 mr-1"></i> Ad-Shield Active</span>
+                <span><i class="fas fa-tachometer-alt text-blue-400 mr-1"></i> Render: 120 FPS</span>
+                <span id="memory-usage">RAM: 14.2 MB</span>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // GLOBAL BROWSER STATE
+        const state = {
+            tabs: [
+                { id: 'tab-1', title: 'Home - Joel\'s Web', url: 'joelsweb://home', history: ['joelsweb://home'], historyIndex: 0 }
+            ],
+            activeTabId: 'tab-1',
+            bookmarks: ['joelsweb://home', 'joelsweb://about', 'joelsweb://features', 'joelsweb://games'],
+            shieldActive: true,
+            theme: 'dark',
+            accentColor: '#3b82f6',
+            gameScore: 0,
+            gameHighScore: 0,
+            gameRunning: false
+        };
+
+        // Theme colors map
+        const themeAccents = {
+            blue: { primary: '#3b82f6', hex50: '#eff6ff', hex100: '#dbeafe', hex500: '#3b82f6', hex600: '#2563eb' },
+            purple: { primary: '#a855f7', hex50: '#faf5ff', hex100: '#f3e8ff', hex500: '#a855f7', hex600: '#9333ea' },
+            emerald: { primary: '#10b981', hex50: '#ecfdf5', hex100: '#d1fae5', hex500: '#10b981', hex600: '#059669' },
+            rose: { primary: '#f43f5e', hex50: '#fff1f2', hex100: '#ffe4e6', hex500: '#f43f5e', hex600: '#e11d48' },
+        };
+
+        window.onload = function() {
+            renderTabs();
+            updateNavigationButtons();
+            renderViewport();
+            startMemorySimulator();
+        };
+
+        // Get Current Active Tab Helper
+        function getActiveTab() {
+            return state.tabs.find(t => t.id === state.activeTabId) || state.tabs[0];
+        }
+
+        function renderTabs() {
+            const container = document.getElementById('tabs-container');
+            container.innerHTML = '';
+
+            state.tabs.forEach(tab => {
+                const isActive = tab.id === state.activeTabId;
+                const tabEl = document.createElement('div');
+                tabEl.className = `flex items-center gap-2 px-3 py-1.5 rounded-t-lg text-xs font-medium cursor-pointer max-w-[180px] min-w-[120px] justify-between transition-all select-none ${
+                    isActive 
+                    ? 'bg-gray-800 text-white font-semibold border-t-2 border-blue-500 shadow-md' 
+                    : 'bg-gray-900/60 text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                }`;
+
+                // Favicon dynamic based on page
+                let iconClass = 'fas fa-globe text-blue-400';
+                if (tab.url.includes('home')) iconClass = 'fas fa-compass text-blue-400';
+                if (tab.url.includes('about')) iconClass = 'fas fa-user-circle text-purple-400';
+                if (tab.url.includes('features')) iconClass = 'fas fa-bolt text-yellow-400';
+                if (tab.url.includes('games')) iconClass = 'fas fa-gamepad text-green-400';
+                if (tab.url.includes('settings')) iconClass = 'fas fa-cog text-pink-400';
+
+                tabEl.onclick = () => switchTab(tab.id);
+                tabEl.innerHTML = `
+                    <div class="flex items-center gap-2 truncate">
+                        <i class="${iconClass} text-xs"></i>
+                        <span class="truncate">${tab.title}</span>
+                    </div>
+                    ${state.tabs.length > 1 ? `
+                        <button onclick="closeTab(event, '${tab.id}')" class="p-0.5 rounded-full hover:bg-gray-700 text-gray-400 hover:text-white transition">
+                            <i class="fas fa-times text-[10px]"></i>
+                        </button>
+                    ` : ''}
+                `;
+                container.appendChild(tabEl);
+            });
+        }
+
+        function createNewTab(url = 'joelsweb://home') {
+            const newId = 'tab-' + Date.now();
+            const newTab = {
+                id: newId,
+                title: getPageTitle(url),
+                url: url,
+                history: [url],
+                historyIndex: 0
+            };
+            state.tabs.push(newTab);
+            state.activeTabId = newId;
+            renderTabs();
+            navigateTo(url, true);
+        }
+
+        function switchTab(tabId) {
+            if (state.activeTabId === tabId) return;
+            state.activeTabId = tabId;
+            renderTabs();
+            const currentTab = getActiveTab();
+            document.getElementById('url-input').value = currentTab.url;
+            updateNavigationButtons();
+            renderViewport();
+        }
+
+        function closeTab(event, tabId) {
+            event.stopPropagation();
+            if (state.tabs.length <= 1) return; // Keep at least 1 tab open
+
+            const index = state.tabs.findIndex(t => t.id === tabId);
+            state.tabs = state.tabs.filter(t => t.id !== tabId);
+
+            if (state.activeTabId === tabId) {
+                const nextTab = state.tabs[Math.max(0, index - 1)];
+                state.activeTabId = nextTab.id;
+            }
+
+            renderTabs();
+            const currentTab = getActiveTab();
+            document.getElementById('url-input').value = currentTab.url;
+            updateNavigationButtons();
+            renderViewport();
+        }
+
+        function navigateTo(url, isNewNavigation = true) {
+            triggerLoadingAnimation();
+
+            // Sanitize & Format URL
+            let targetUrl = url.trim();
+            if (!targetUrl.startsWith('joelsweb://') && !targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+                if (targetUrl.includes('.') && !targetUrl.includes(' ')) {
+                    targetUrl = 'https://' + targetUrl;
+                } else {
+                    targetUrl = 'joelsweb://home?q=' + encodeURIComponent(targetUrl);
+                }
+            }
+
+            const activeTab = getActiveTab();
+            activeTab.url = targetUrl;
+            activeTab.title = getPageTitle(targetUrl);
+
+            if (isNewNavigation) {
+                // Truncate forward history if navigating to a new place
+                activeTab.history = activeTab.history.slice(0, activeTab.historyIndex + 1);
+                activeTab.history.push(targetUrl);
+                activeTab.historyIndex = activeTab.history.length - 1;
+            }
+
+            document.getElementById('url-input').value = targetUrl;
+            updateBookmarkStarState();
+            updateNavigationButtons();
+            renderTabs();
+
+            setTimeout(() => {
+                renderViewport();
+            }, 150);
+        }
+
+        function goBack() {
+            const activeTab = getActiveTab();
+            if (activeTab.historyIndex > 0) {
+                activeTab.historyIndex--;
+                const prevUrl = activeTab.history[activeTab.historyIndex];
+                navigateTo(prevUrl, false);
+            }
+        }
+
+        function goForward() {
+            const activeTab = getActiveTab();
+            if (activeTab.historyIndex < activeTab.history.length - 1) {
+                activeTab.historyIndex++;
+                const nextUrl = activeTab.history[activeTab.historyIndex];
+                navigateTo(nextUrl, false);
+            }
+        }
+
+        function refreshPage() {
+            const icon = document.getElementById('refresh-icon');
+            icon.classList.add('fa-spin');
+            triggerLoadingAnimation();
+            setTimeout(() => {
+                icon.classList.remove('fa-spin');
+                renderViewport();
+            }, 400);
+        }
+
+        function updateNavigationButtons() {
+            const activeTab = getActiveTab();
+            const btnBack = document.getElementById('btn-back');
+            const btnForward = document.getElementById('btn-forward');
+
+            btnBack.disabled = activeTab.historyIndex <= 0;
+            btnForward.disabled = activeTab.historyIndex >= activeTab.history.length - 1;
+        }
+
+        function handleUrlSubmit(event) {
+            event.preventDefault();
+            const urlValue = document.getElementById('url-input').value;
+            navigateTo(urlValue);
+        }
+
+        function triggerLoadingAnimation() {
+            const bar = document.getElementById('loading-bar');
+            bar.classList.remove('animate-loading');
+            void bar.offsetWidth; // Force reflow
+            bar.classList.add('animate-loading');
+        }
+
+        function getPageTitle(url) {
+            if (url.includes('home')) return 'Home - Joel\'s Web';
+            if (url.includes('about')) return 'About - Joel';
+            if (url.includes('features')) return 'Features - Speed & Security';
+            if (url.includes('games')) return 'Arcade - Mini Runner';
+            if (url.includes('settings')) return 'Browser Settings';
+            if (url.startsWith('http')) return url.replace('https://', '').replace('http://', '').split('/')[0];
+            return 'Web Page';
+        }
+
+        function updateBookmarkStarState() {
+            const currentTab = getActiveTab();
+            const starBtn = document.getElementById('star-btn');
+            const isBookmarked = state.bookmarks.includes(currentTab.url);
+            
+            if (isBookmarked) {
+                starBtn.innerHTML = '<i class="fas fa-star text-yellow-400 text-sm"></i>';
+            } else {
+                starBtn.innerHTML = '<i class="far fa-star text-gray-400 hover:text-yellow-400 text-sm"></i>';
+            }
+        }
+
+        function toggleBookmarkCurrent() {
+            const currentTab = getActiveTab();
+            const index = state.bookmarks.indexOf(currentTab.url);
+            if (index > -1) {
+                state.bookmarks.splice(index, 1);
+            } else {
+                state.bookmarks.push(currentTab.url);
+            }
+            updateBookmarkStarState();
+        }
+
+        function toggleShield() {
+            state.shieldActive = !state.shieldActive;
+            const btn = document.getElementById('shield-btn');
+            const statusText = document.getElementById('status-text');
+            
+            if (state.shieldActive) {
+                btn.className = "p-1.5 text-green-400 hover:bg-gray-700 rounded-lg transition";
+                btn.title = "Joel Shield: Active Protection";
+                statusText.innerText = "Connected to Joel's Web Network - 100% Shielded";
+            } else {
+                btn.className = "p-1.5 text-gray-500 hover:bg-gray-700 rounded-lg transition";
+                btn.title = "Joel Shield: Disabled";
+                statusText.innerText = "Joel Shield Disables - Proceed with Caution";
+            }
+        }
+
+        function simulateWindowAction(action) {
+            const viewport = document.getElementById('browser-viewport');
+            if (action === 'close') {
+                viewport.innerHTML = `
+                    <div class="h-full flex flex-col items-center justify-center p-8 text-center text-gray-500">
+                        <i class="fas fa-power-off text-6xl mb-4 text-gray-700"></i>
+                        <h2 class="text-2xl font-bold mb-2 text-gray-400">Joel's Web Session Closed</h2>
+                        <p class="text-sm max-w-md mb-6">You closed all active windows. Click below to launch a new browsing session.</p>
+                        <button onclick="location.reload()" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold shadow-lg transition">Re-launch Browser</button>
+                    </div>
+                `;
+            } else if (action === 'minimize') {
+                viewport.innerHTML = `
+                    <div class="h-full flex flex-col items-center justify-center p-8 text-center">
+                        <p class="text-gray-400 mb-4 font-mono text-sm">Window Minimized</p>
+                        <button onclick="renderViewport()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm border border-gray-700">Restore Window</button>
+                    </div>
+                `;
+            }
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen().catch(() => {});
+                }
+            }
+        }
+
+        function startMemorySimulator() {
+            setInterval(() => {
+                const mem = (12 + Math.random() * 4).toFixed(1);
+                const memEl = document.getElementById('memory-usage');
+                if (memEl) memEl.innerText = `RAM: ${mem} MB`;
+            }, 3000);
+        }
+
+        function renderViewport() {
+            const currentTab = getActiveTab();
+            const url = currentTab.url;
+            const viewport = document.getElementById('browser-viewport');
+
+            // Stop game if running and switching pages
+            if (state.gameRunning && !url.includes('games')) {
+                state.gameRunning = false;
+            }
+
+            if (url.startsWith('joelsweb://home')) {
+                viewport.innerHTML = getHomePageHTML();
+            } else if (url.startsWith('joelsweb://about')) {
+                viewport.innerHTML = getAboutPageHTML();
+            } else if (url.startsWith('joelsweb://features')) {
+                viewport.innerHTML = getFeaturesPageHTML();
+            } else if (url.startsWith('joelsweb://games')) {
+                viewport.innerHTML = getGamesPageHTML();
+                initMiniGame();
+            } else if (url.startsWith('joelsweb://settings')) {
+                viewport.innerHTML = getSettingsPageHTML();
+            } else {
+                viewport.innerHTML = getSimulatedExternalPageHTML(url);
+            }
+        }
+
+        function getHomePageHTML() {
+            return `
+                <div class="max-w-5xl mx-auto px-6 py-12 flex flex-col items-center text-center">
+                    <!-- Hero Badge -->
+                    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-medium mb-8">
+                        <span class="flex h-2 w-2 rounded-full bg-blue-400 animate-ping"></span>
+                        Introducing Joel's Web Engine v3.5
+                    </div>
+
+                    <!-- Main Hero Header -->
+                    <h1 class="text-4xl sm:text-6xl font-extrabold tracking-tight text-white mb-6">
+                        Experience the Next Web with <br/>
+                        <span class="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-500">
+                            Joel's Web Browser
+                        </span>
+                    </h1>
+
+                    <p class="text-base sm:text-xl text-gray-400 max-w-2xl mb-10 leading-relaxed">
+                        A futuristic, lightning-fast web experience built for speed, custom flexibility, built-in security, and seamless interactive canvas integration.
+                    </p>
+
+                    <!-- Search Bar Widget in Home Page -->
+                    <div class="w-full max-w-xl mb-12">
+                        <div class="relative flex items-center">
+                            <i class="fas fa-search absolute left-4 text-gray-400 text-lg"></i>
+                            <input type="text" 
+                                onkeypress="if(event.key==='Enter') navigateTo(this.value)"
+                                placeholder="Search Joel's Web or type a command..." 
+                                class="w-full bg-gray-900 border border-gray-700/80 focus:border-blue-500 rounded-2xl py-4 pl-12 pr-28 text-sm text-gray-100 placeholder-gray-500 focus:outline-none shadow-xl transition"
+                            />
+                            <button onclick="navigateTo('joelsweb://features')" class="absolute right-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-semibold transition">
+                                Explore
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Quick Navigation Cards Grid -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full text-left mt-4">
+                        <div onclick="navigateTo('joelsweb://about')" class="p-6 bg-gray-900/60 hover:bg-gray-800/80 border border-gray-800 hover:border-gray-700 rounded-2xl cursor-pointer transition transform hover:-translate-y-1 group">
+                            <div class="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center mb-4 group-hover:scale-110 transition">
+                                <i class="fas fa-user text-lg"></i>
+                            </div>
+                            <h3 class="text-base font-bold text-white mb-1">Meet Joel</h3>
+                            <p class="text-xs text-gray-400">Discover the mind behind the browser and developer skills.</p>
+                        </div>
+
+                        <div onclick="navigateTo('joelsweb://features')" class="p-6 bg-gray-900/60 hover:bg-gray-800/80 border border-gray-800 hover:border-gray-700 rounded-2xl cursor-pointer transition transform hover:-translate-y-1 group">
+                            <div class="w-10 h-10 rounded-xl bg-yellow-500/10 text-yellow-400 flex items-center justify-center mb-4 group-hover:scale-110 transition">
+                                <i class="fas fa-tachometer-alt text-lg"></i>
+                            </div>
+                            <h3 class="text-base font-bold text-white mb-1">Turbo Features</h3>
+                            <p class="text-xs text-gray-400">Explore Ad-Shield, canvas graphics, and zero latency.</p>
+                        </div>
+
+                        <div onclick="navigateTo('joelsweb://games')" class="p-6 bg-gray-900/60 hover:bg-gray-800/80 border border-gray-800 hover:border-gray-700 rounded-2xl cursor-pointer transition transform hover:-translate-y-1 group">
+                            <div class="w-10 h-10 rounded-xl bg-green-500/10 text-green-400 flex items-center justify-center mb-4 group-hover:scale-110 transition">
+                                <i class="fas fa-gamepad text-lg"></i>
+                            </div>
+                            <h3 class="text-base font-bold text-white mb-1">Arcade Mode</h3>
+                            <p class="text-xs text-gray-400">Play built-in mini games inside the browser canvas directly.</p>
+                        </div>
+
+                        <div onclick="navigateTo('joelsweb://settings')" class="p-6 bg-gray-900/60 hover:bg-gray-800/80 border border-gray-800 hover:border-gray-700 rounded-2xl cursor-pointer transition transform hover:-translate-y-1 group">
+                            <div class="w-10 h-10 rounded-xl bg-pink-500/10 text-pink-400 flex items-center justify-center mb-4 group-hover:scale-110 transition">
+                                <i class="fas fa-sliders-h text-lg"></i>
+                            </div>
+                            <h3 class="text-base font-bold text-white mb-1">Custom Themes</h3>
+                            <p class="text-xs text-gray-400">Personalize themes, accent colors, and privacy settings.</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getAboutPageHTML() {
+            return `
+                <div class="max-w-4xl mx-auto px-6 py-12">
+                    <!-- Profile Header Card -->
+                    <div class="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 border border-gray-800 rounded-3xl p-8 mb-8 flex flex-col md:flex-row items-center gap-8 shadow-xl">
+                        <div class="relative">
+                            <div class="w-32 h-32 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-5xl font-extrabold text-white shadow-lg border-2 border-white/20">
+                                J
+                            </div>
+                            <span class="absolute -bottom-2 -right-2 bg-green-500 border-4 border-gray-900 w-7 h-7 rounded-full flex items-center justify-center text-[10px] text-white" title="Available for projects">
+                                <i class="fas fa-check"></i>
+                            </span>
+                        </div>
+                        <div class="flex-1 text-center md:text-left">
+                            <div class="inline-block px-3 py-1 bg-purple-500/10 border border-purple-500/30 text-purple-400 text-xs font-semibold rounded-full mb-2">
+                                Lead Web Architect & Creator
+                            </div>
+                            <h2 class="text-3xl font-extrabold text-white">Joel</h2>
+                            <p class="text-gray-400 text-sm mt-1 mb-4">Passionate Full-Stack Developer & UI/UX Innovator</p>
+                            <p class="text-gray-300 text-sm leading-relaxed max-w-xl">
+                                Welcome to my custom web browser project! "Joel's Web" represents my vision for modular, fast, and delightful web applications. I craft modern web experiences with clean code, sleek aesthetics, and immersive interaction.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Skills & Tech Stack -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div class="bg-gray-900/70 border border-gray-800 rounded-2xl p-6">
+                            <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                                <i class="fas fa-code text-blue-400"></i> Tech Stack & Expertise
+                            </h3>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="px-3 py-1.5 bg-gray-800 text-gray-200 text-xs rounded-xl border border-gray-700">JavaScript / ES6+</span>
+                                <span class="px-3 py-1.5 bg-gray-800 text-gray-200 text-xs rounded-xl border border-gray-700">Tailwind CSS</span>
+                                <span class="px-3 py-1.5 bg-gray-800 text-gray-200 text-xs rounded-xl border border-gray-700">HTML5 Canvas</span>
+                                <span class="px-3 py-1.5 bg-gray-800 text-gray-200 text-xs rounded-xl border border-gray-700">React & Vue</span>
+                                <span class="px-3 py-1.5 bg-gray-800 text-gray-200 text-xs rounded-xl border border-gray-700">Node.js</span>
+                                <span class="px-3 py-1.5 bg-gray-800 text-gray-200 text-xs rounded-xl border border-gray-700">UI/UX Architecture</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-900/70 border border-gray-800 rounded-2xl p-6">
+                            <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                                <i class="fas fa-paper-plane text-purple-400"></i> Get In Touch
+                            </h3>
+                            <div class="space-y-3 text-sm">
+                                <a href="#" class="flex items-center justify-between p-2.5 bg-gray-800/60 hover:bg-gray-800 rounded-xl text-gray-300 transition">
+                                    <span class="flex items-center gap-2"><i class="fab fa-github text-white"></i> GitHub</span>
+                                    <i class="fas fa-external-link-alt text-xs text-gray-500"></i>
+                                </a>
+                                <a href="#" class="flex items-center justify-between p-2.5 bg-gray-800/60 hover:bg-gray-800 rounded-xl text-gray-300 transition">
+                                    <span class="flex items-center gap-2"><i class="fab fa-twitter text-blue-400"></i> Twitter / X</span>
+                                    <i class="fas fa-external-link-alt text-xs text-gray-500"></i>
+                                </a>
+                                <a href="#" class="flex items-center justify-between p-2.5 bg-gray-800/60 hover:bg-gray-800 rounded-xl text-gray-300 transition">
+                                    <span class="flex items-center gap-2"><i class="fas fa-envelope text-red-400"></i> Contact Joel</span>
+                                    <i class="fas fa-arrow-right text-xs text-gray-500"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getFeaturesPageHTML() {
+            return `
+                <div class="max-w-5xl mx-auto px-6 py-12">
+                    <div class="text-center mb-12">
+                        <h2 class="text-3xl sm:text-4xl font-extrabold text-white mb-3">Browser Features</h2>
+                        <p class="text-gray-400 max-w-xl mx-auto text-sm">Why Joel's Web is built to stand out from standard web browsers.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Feature 1 -->
+                        <div class="bg-gray-900/80 border border-gray-800 hover:border-blue-500/50 rounded-2xl p-6 transition">
+                            <div class="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center text-xl mb-4">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                            <h3 class="text-lg font-bold text-white mb-2">Joel Shield Protection</h3>
+                            <p class="text-gray-400 text-xs leading-relaxed">
+                                Built-in ad blocker and tracker shield keeps your browsing private, safe, and lightning fast without extra extensions.
+                            </p>
+                        </div>
+
+                        <!-- Feature 2 -->
+                        <div class="bg-gray-900/80 border border-gray-800 hover:border-yellow-500/50 rounded-2xl p-6 transition">
+                            <div class="w-12 h-12 rounded-xl bg-yellow-500/10 text-yellow-400 flex items-center justify-center text-xl mb-4">
+                                <i class="fas fa-bolt"></i>
+                            </div>
+                            <h3 class="text-lg font-bold text-white mb-2">Instant Navigation Engine</h3>
+                            <p class="text-gray-400 text-xs leading-relaxed">
+                                Real-time dynamic state stack management for seamless, instant tab switching and backward/forward traversal.
+                            </p>
+                        </div>
+
+                        <!-- Feature 3 -->
+                        <div class="bg-gray-900/80 border border-gray-800 hover:border-green-500/50 rounded-2xl p-6 transition">
+                            <div class="w-12 h-12 rounded-xl bg-green-500/10 text-green-400 flex items-center justify-center text-xl mb-4">
+                                <i class="fas fa-gamepad"></i>
+                            </div>
+                            <h3 class="text-lg font-bold text-white mb-2">Embedded Arcade Engine</h3>
+                            <p class="text-gray-400 text-xs leading-relaxed">
+                                Play offline arcade mini-games directly in the web viewport powered by HTML5 Canvas graphics.
+                            </p>
+                        </div>
+
+                        <!-- Feature 4 -->
+                        <div class="bg-gray-900/80 border border-gray-800 hover:border-purple-500/50 rounded-2xl p-6 transition">
+                            <div class="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center text-xl mb-4">
+                                <i class="fas fa-palette"></i>
+                            </div>
+                            <h3 class="text-lg font-bold text-white mb-2">Adaptive Theme Engine</h3>
+                            <p class="text-gray-400 text-xs leading-relaxed">
+                                Full control over accent colors, browser layout themes, and sleek dark mode glassmorphism UI.
+                            </p>
+                        </div>
+
+                        <!-- Feature 5 -->
+                        <div class="bg-gray-900/80 border border-gray-800 hover:border-pink-500/50 rounded-2xl p-6 transition">
+                            <div class="w-12 h-12 rounded-xl bg-pink-500/10 text-pink-400 flex items-center justify-center text-xl mb-4">
+                                <i class="fas fa-layer-group"></i>
+                            </div>
+                            <h3 class="text-lg font-bold text-white mb-2">Multi-Tab Sandbox</h3>
+                            <p class="text-gray-400 text-xs leading-relaxed">
+                                Manage multiple isolated browser tabs with independent history state stacks and fast close controls.
+                            </p>
+                        </div>
+
+                        <!-- Feature 6 -->
+                        <div class="bg-gray-900/80 border border-gray-800 hover:border-indigo-500/50 rounded-2xl p-6 transition">
+                            <div class="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-xl mb-4">
+                                <i class="fas fa-terminal"></i>
+                            </div>
+                            <h3 class="text-lg font-bold text-white mb-2">Custom Protocols</h3>
+                            <p class="text-gray-400 text-xs leading-relaxed">
+                                Built-in <code class="text-blue-400 font-mono">joelsweb://</code> custom protocol resolver for ultra-fast internal web app access.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getGamesPageHTML() {
+            return `
+                <div class="max-w-3xl mx-auto px-4 py-8 flex flex-col items-center">
+                    <div class="text-center mb-6">
+                        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-xs font-semibold mb-2">
+                            <i class="fas fa-gamepad"></i> Browser Canvas Arcade
+                        </div>
+                        <h2 class="text-2xl sm:text-3xl font-extrabold text-white">Joel's Cyber Runner</h2>
+                        <p class="text-gray-400 text-xs sm:text-sm mt-1">Press <kbd class="px-2 py-0.5 bg-gray-800 border border-gray-700 rounded text-gray-200">SPACE</kbd> or <kbd class="px-2 py-0.5 bg-gray-800 border border-gray-700 rounded text-gray-200">TAP</kbd> screen to jump over obstacles!</p>
+                    </div>
+
+                    <!-- Game Container -->
+                    <div class="relative w-full max-w-2xl bg-gray-900 border-2 border-gray-700 rounded-2xl overflow-hidden shadow-2xl flex flex-col items-center">
+                        <canvas id="game-canvas" width="600" height="240" class="w-full h-auto bg-gray-950 block"></canvas>
+                        
+                        <!-- Overlay HUD -->
+                        <div id="game-overlay" class="absolute inset-0 bg-black/75 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6">
+                            <i class="fas fa-space-shuttle text-4xl text-blue-400 mb-3 animate-bounce"></i>
+                            <h3 class="text-xl font-bold text-white mb-1">Cyber Runner Arcade</h3>
+                            <p class="text-xs text-gray-400 mb-6 max-w-xs">Dodge neon security hazards inside the Joel's Web digital grid!</p>
+                            <button onclick="startGame()" class="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white font-bold text-sm rounded-xl shadow-lg transition transform hover:scale-105">
+                                Start Game
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Game Controls Footer -->
+                    <div class="mt-4 flex items-center justify-between w-full max-w-2xl text-xs text-gray-400 px-2">
+                        <span>High Score: <strong id="high-score-val" class="text-yellow-400">0</strong></span>
+                        <div class="flex gap-2">
+                            <button onclick="triggerJump()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg sm:hidden font-bold">
+                                JUMP NOW
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getSettingsPageHTML() {
+            return `
+                <div class="max-w-3xl mx-auto px-6 py-10">
+                    <h2 class="text-2xl font-extrabold text-white mb-6 flex items-center gap-2">
+                        <i class="fas fa-sliders-h text-pink-400"></i> Browser Settings
+                    </h2>
+
+                    <div class="space-y-6">
+                        <!-- Appearance Settings -->
+                        <div class="bg-gray-900/80 border border-gray-800 rounded-2xl p-6">
+                            <h3 class="text-sm font-bold text-gray-300 uppercase tracking-wider mb-4">Appearance & Styling</h3>
+                            <div class="flex items-center justify-between py-3 border-b border-gray-800">
+                                <div>
+                                    <div class="text-sm font-semibold text-white">Accent Theme Color</div>
+                                    <div class="text-xs text-gray-400">Select accent highlights for the browser chrome</div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button onclick="setAccentColor('blue')" class="w-7 h-7 rounded-full bg-blue-500 border-2 border-white/40 hover:scale-110 transition"></button>
+                                    <button onclick="setAccentColor('purple')" class="w-7 h-7 rounded-full bg-purple-500 border-2 border-white/40 hover:scale-110 transition"></button>
+                                    <button onclick="setAccentColor('emerald')" class="w-7 h-7 rounded-full bg-emerald-500 border-2 border-white/40 hover:scale-110 transition"></button>
+                                    <button onclick="setAccentColor('rose')" class="w-7 h-7 rounded-full bg-rose-500 border-2 border-white/40 hover:scale-110 transition"></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Security & Shield Settings -->
+                        <div class="bg-gray-900/80 border border-gray-800 rounded-2xl p-6">
+                            <h3 class="text-sm font-bold text-gray-300 uppercase tracking-wider mb-4">Privacy & Security</h3>
+                            <div class="flex items-center justify-between py-3 border-b border-gray-800">
+                                <div>
+                                    <div class="text-sm font-semibold text-white">Joel Shield Protection</div>
+                                    <div class="text-xs text-gray-400">Block popup ads, scripts, and third-party trackers</div>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" ${state.shieldActive ? 'checked' : ''} onchange="toggleShield()" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+
+                            <div class="flex items-center justify-between py-3">
+                                <div>
+                                    <div class="text-sm font-semibold text-white">Browser Data & Cache</div>
+                                    <div class="text-xs text-gray-400">Clear temporary browser cache and history stack</div>
+                                </div>
+                                <button onclick="clearBrowserCache()" class="px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 text-xs font-semibold rounded-xl transition">
+                                    Clear Cache
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- About Version -->
+                        <div class="bg-gray-900/80 border border-gray-800 rounded-2xl p-6 text-xs text-gray-400 flex justify-between items-center">
+                            <span>Joel's Web Core Engine Version: <strong>v3.5.2-RELEASE</strong></span>
+                            <span class="text-green-400 flex items-center gap-1"><i class="fas fa-check-circle"></i> Up to Date</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getSimulatedExternalPageHTML(url) {
+            return `
+                <div class="max-w-4xl mx-auto px-6 py-12 text-center">
+                    <div class="w-16 h-16 rounded-2xl bg-gray-800 text-blue-400 flex items-center justify-center text-2xl mx-auto mb-4 border border-gray-700">
+                        <i class="fas fa-globe"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-white mb-2">Simulated Web Address</h2>
+                    <p class="font-mono text-sm text-blue-400 mb-6 bg-gray-900 py-2 px-4 rounded-xl border border-gray-800 inline-block">${url}</p>
+                    <p class="text-gray-400 text-sm max-w-md mx-auto mb-8">
+                        You navigated to an external web link inside Joel's Web sandbox simulation engine!
+                    </p>
+                    <button onclick="navigateTo('joelsweb://home')" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold text-xs transition">
+                        Return to Joel's Web Home
+                    </button>
+                </div>
+            `;
+        }
+
+        function setAccentColor(colorKey) {
+            const theme = themeAccents[colorKey];
+            if (!theme) return;
+            document.documentElement.style.setProperty('--brand-500', theme.hex500);
+            document.documentElement.style.setProperty('--brand-600', theme.hex600);
+            state.accentColor = theme.hex500;
+        }
+
+        function clearBrowserCache() {
+            state.tabs.forEach(t => {
+                t.history = [t.url];
+                t.historyIndex = 0;
+            });
+            updateNavigationButtons();
+            
+            const statusText = document.getElementById('status-text');
+            if (statusText) statusText.innerText = "Browser Cache & History Cleared!";
+            setTimeout(() => {
+                if (statusText) statusText.innerText = "Connected to Joel's Web Network - 100% Secure";
+            }, 2500);
+        }
+
+        let gameLoopId = null;
+        let gameCanvas, gameCtx;
+        let runner = { x: 50, y: 150, width: 24, height: 24, vy: 0, gravity: 0.8, jumping: false };
+        let obstacles = [];
+        let score = 0;
+
+        function initMiniGame() {
+            gameCanvas = document.getElementById('game-canvas');
+            if (!gameCanvas) return;
+            gameCtx = gameCanvas.getContext('2d');
+
+            // Global Keydown Handler for Jump
+            window.onkeydown = function(e) {
+                if (e.code === 'Space' && state.gameRunning) {
+                    e.preventDefault();
+                    triggerJump();
+                }
+            };
+
+            // Touch / Click Handler
+            gameCanvas.onclick = function() {
+                if (state.gameRunning) {
+                    triggerJump();
+                }
+            };
+
+            // Draw Initial Idle Canvas Frame
+            drawIdleCanvas();
+        }
+
+        function drawIdleCanvas() {
+            if (!gameCtx) return;
+            gameCtx.fillStyle = '#030712';
+            gameCtx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+
+            // Ground line
+            gameCtx.strokeStyle = '#374151';
+            gameCtx.lineWidth = 2;
+            gameCtx.beginPath();
+            gameCtx.moveTo(0, 190);
+            gameCtx.lineTo(600, 190);
+            gameCtx.stroke();
+        }
+
+        function triggerJump() {
+            if (!runner.jumping) {
+                runner.vy = -12;
+                runner.jumping = true;
+            }
+        }
+
+        function startGame() {
+            const overlay = document.getElementById('game-overlay');
+            if (overlay) overlay.classList.add('hidden');
+
+            state.gameRunning = true;
+            score = 0;
+            runner.y = 150;
+            runner.vy = 0;
+            runner.jumping = false;
+            obstacles = [];
+
+            if (gameLoopId) cancelAnimationFrame(gameLoopId);
+            gameLoop();
+        }
+
+        function gameLoop() {
+            if (!state.gameRunning) return;
+
+            updateGameLogic();
+            renderGameCanvas();
+
+            gameLoopId = requestAnimationFrame(gameLoop);
+        }
+
+        function updateGameLogic() {
+            // Apply Gravity
+            runner.vy += runner.gravity;
+            runner.y += runner.vy;
+
+            // Ground Collision
+            if (runner.y >= 150) {
+                runner.y = 150;
+                runner.vy = 0;
+                runner.jumping = false;
+            }
+
+            // Spawn Obstacles
+            if (Math.random() < 0.02 && (obstacles.length === 0 || obstacles[obstacles.length - 1].x < 420)) {
+                obstacles.push({
+                    x: 600,
+                    y: 154,
+                    width: 18,
+                    height: 20 + Math.random() * 12,
+                    speed: 5 + Math.floor(score / 100)
+                });
+            }
+
+            // Move Obstacles
+            for (let i = 0; i < obstacles.length; i++) {
+                obstacles[i].x -= obstacles[i].speed;
+
+                // Collision Detection
+                let obs = obstacles[i];
+                if (
+                    runner.x < obs.x + obs.width &&
+                    runner.x + runner.width > obs.x &&
+                    runner.y < obs.y + obs.height &&
+                    runner.y + runner.height > obs.y
+                ) {
+                    gameOver();
+                    return;
+                }
+            }
+
+            // Filter out-of-screen obstacles
+            obstacles = obstacles.filter(o => o.x > -30);
+
+            // Increase score
+            score++;
+        }
+
+        function renderGameCanvas() {
+            if (!gameCtx) return;
+
+            // Clear Background
+            gameCtx.fillStyle = '#030712';
+            gameCtx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+
+            // Draw Neon Grid Lines
+            gameCtx.strokeStyle = '#1f2937';
+            gameCtx.lineWidth = 1;
+            for (let x = 0; x < gameCanvas.width; x += 30) {
+                gameCtx.beginPath();
+                gameCtx.moveTo(x, 0);
+                gameCtx.lineTo(x, 190);
+                gameCtx.stroke();
+            }
+
+            // Draw Ground
+            gameCtx.strokeStyle = '#3b82f6';
+            gameCtx.lineWidth = 2;
+            gameCtx.beginPath();
+            gameCtx.moveTo(0, 190);
+            gameCtx.lineTo(600, 190);
+            gameCtx.stroke();
+
+            // Draw Cyber Player Box
+            gameCtx.fillStyle = '#10b981';
+            gameCtx.shadowColor = '#10b981';
+            gameCtx.shadowBlur = 10;
+            gameCtx.fillRect(runner.x, runner.y, runner.width, runner.height);
+            gameCtx.shadowBlur = 0; // Reset blur
+
+            // Draw Obstacles (Red Hazards)
+            gameCtx.fillStyle = '#ef4444';
+            gameCtx.shadowColor = '#ef4444';
+            gameCtx.shadowBlur = 8;
+            obstacles.forEach(obs => {
+                gameCtx.fillRect(obs.x, obs.y, obs.width, obs.height);
+            });
+            gameCtx.shadowBlur = 0; // Reset blur
+
+            // Draw HUD Score
+            gameCtx.fillStyle = '#f3f4f6';
+            gameCtx.font = '12px "Fira Code", monospace';
+            gameCtx.fillText(`SCORE: ${score}`, 20, 30);
+        }
+
+        function gameOver() {
+            state.gameRunning = false;
+            if (score > state.gameHighScore) {
+                state.gameHighScore = score;
+                const hsEl = document.getElementById('high-score-val');
+                if (hsEl) hsEl.innerText = state.gameHighScore;
+            }
+
+            const overlay = document.getElementById('game-overlay');
+            if (overlay) {
+                overlay.classList.remove('hidden');
+                overlay.innerHTML = `
+                    <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-2"></i>
+                    <h3 class="text-xl font-bold text-white mb-1">System Overload!</h3>
+                    <p class="text-xs text-gray-400 mb-2">Final Distance: <strong class="text-green-400">${score}</strong></p>
+                    <p class="text-xs text-yellow-400 mb-6">High Score: ${state.gameHighScore}</p>
+                    <button onclick="startGame()" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm rounded-xl shadow-lg transition transform hover:scale-105">
+                        Try Again
+                    </button>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
